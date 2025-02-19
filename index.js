@@ -2,12 +2,13 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+let flows = require('./flows.js');
 
 // 初始化Express应用和HTTP服务器
 const app = express();
 const server = http.createServer(app);
 
-//----todo 服务器下发人物
+//----todo 服务器下发
 let tasks = {
     "search":[
         {"module":"action", "action":"click_by_resource_id", "param":["com.xingin.xhs:id/hjp"], "delay":2, "desc":"点击搜索"},
@@ -27,6 +28,8 @@ let tasks = {
         {"module":"action", "action":"go_back", "param":[], "delay":1, "desc":"返回"}
     ]
 }
+
+console.log(flows.getFlow("search"));
 
 let clients = {};
 // 初始化Socket.IO
@@ -49,12 +52,27 @@ io.on('connection', (socket) => {
       callback({ success: false, message: 'Invalid username or password' });
     }
     clients[socket.id] = socket;
+
+    socket.on('DEVICE_LIST', (data) => {
+        console.log(data);
+        socket.devices = data;
+    });
+
+    //延迟10秒，发送任务
+    setTimeout(()=>{
+        for(let key in clients){
+            let client = clients[key];
+            let devices = client.devices;
+            for(let device_id in devices){
+                let task = tasks.search;
+                client.emit('TASK', {device_id:device_id, task:task});
+            }
+        }
+    }, 10000);
+
   });
 
-  socket.on('DEVICE_LIST', (data, callback) => {
-    console.log(data);
-    socket.devices = data;
-  });
+  
 
   // 监听客户端断开连接
   socket.on('disconnect', () => {
